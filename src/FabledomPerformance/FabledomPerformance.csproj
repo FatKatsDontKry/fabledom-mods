@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>FabledomPerformance</AssemblyName>
+    <RootNamespace>FabledomPerformance</RootNamespace>
+    <Version>0.4.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(ManagedDir)\GPUInstancer.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\AstarPathfindingProject.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\PackageTools.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Drawing.dll" Private="false" />
+  </ItemGroup>
+</Project>

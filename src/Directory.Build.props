@@ -1,0 +1,33 @@
+﻿<Project>
+  <!-- Shared settings for every Fabledom plugin project under src\. -->
+  <PropertyGroup>
+    <GameDir>C:\Program Files (x86)\Steam\steamapps\common\Fabledom</GameDir>
+    <ManagedDir>$(GameDir)\Fabledom_Data\Managed</ManagedDir>
+    <BepInExDir>$(GameDir)\BepInEx</BepInExDir>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="$(BepInExDir)\core\BepInEx.dll" Private="false" />
+    <Reference Include="$(BepInExDir)\core\0Harmony.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Assembly-CSharp-firstpass.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.CoreModule.dll" Private="false" />
+  </ItemGroup>
+
+  <!-- After each build, drop the plugin straight into the game's plugins folder. -->
+  <Target Name="DeployToGame" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BepInExDir)\plugins" Retries="0" ContinueOnError="true">
+      <Output TaskParameter="CopiedFiles" ItemName="_Deployed" />
+    </Copy>
+    <Message Importance="high" Condition="'@(_Deployed)' != ''" Text="Deployed $(TargetFileName) to $(BepInExDir)\plugins" />
+    <Warning Condition="'@(_Deployed)' == ''" Text="NOT DEPLOYED: $(TargetFileName) is in use. Close Fabledom and build again." />
+  </Target>
+</Project>

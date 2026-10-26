@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>FabledomTailor</AssemblyName>
+    <RootNamespace>FabledomTailor</RootNamespace>
+    <Version>0.9.1</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="tailor_shop.obj" />
+    <EmbeddedResource Include="confectionery_shop.obj" />
+    <EmbeddedResource Include="house_attachments_cloth_line.obj" />
+    <EmbeddedResource Include="house_attachments_cloth_line_1.obj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="$(ManagedDir)\Unity.Localization.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Sirenix.Serialization.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Assembly-ComponentSaveSystem.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\BehaviorDesigner.Runtime.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Unity.TextMeshPro.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\AstarPathfindingProject.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\PackageTools.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Drawing.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.UI.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.JSONSerializeModule.dll" Private="false" />
+  </ItemGroup>
+</Project>

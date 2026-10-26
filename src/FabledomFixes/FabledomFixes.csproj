@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>FabledomFixes</AssemblyName>
+    <RootNamespace>FabledomFixes</RootNamespace>
+    <Version>0.5.1</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(ManagedDir)\BehaviorDesigner.Runtime.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Unity.Localization.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\AstarPathfindingProject.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\PackageTools.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Drawing.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Assembly-ComponentSaveSystem.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.UI.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Unity.TextMeshPro.dll" Private="false" />
+  </ItemGroup>
+
+  <!-- Parked: this build goes to plugins-off, never straight into plugins, so a build cannot change a running or
+       next-launched game. Copy the DLL into plugins by hand with the game closed. -->
+  <Target Name="DeployToGame" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BepInExDir)\plugins-off" Retries="0" ContinueOnError="true">
+      <Output TaskParameter="CopiedFiles" ItemName="_Parked" />
+    </Copy>
+    <Message Importance="high" Condition="'@(_Parked)' != ''" Text="Parked $(TargetFileName) in $(BepInExDir)\plugins-off (not loaded until moved to plugins)" />
+    <Warning Condition="'@(_Parked)' == ''" Text="NOT PARKED: could not copy $(TargetFileName) to plugins-off." />
+  </Target>
+</Project>
+

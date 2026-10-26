@@ -1,0 +1,13 @@
+# Build output
+**/bin/
+**/obj/
+*.user
+.vs/
+
+# Release zips go on GitHub Releases, not in history
+release/**/*.zip
+
+# Game code, never published
+decompiled/
+
+__pycache__/

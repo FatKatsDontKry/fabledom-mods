@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>FabledomSickness</AssemblyName>
+    <RootNamespace>FabledomSickness</RootNamespace>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(ManagedDir)\Unity.Localization.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Assembly-ComponentSaveSystem.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\UnityEngine.JSONSerializeModule.dll" Private="false" />
+  </ItemGroup>
+
+  <!-- Parked by default: this build goes to plugins-off, not plugins, so a build never changes a running
+       or next-launched game. Move the DLL into plugins by hand (game closed) to try it. -->
+  <Target Name="DeployToGame" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(BepInExDir)\plugins-off" Retries="0" ContinueOnError="true">
+      <Output TaskParameter="CopiedFiles" ItemName="_Parked" />
+    </Copy>
+    <Message Importance="high" Condition="'@(_Parked)' != ''" Text="Parked $(TargetFileName) in $(BepInExDir)\plugins-off (not loaded until moved to plugins)" />
+    <Warning Condition="'@(_Parked)' == ''" Text="NOT PARKED: could not copy $(TargetFileName) to plugins-off." />
+  </Target>
+</Project>

@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>FabledomLetters</AssemblyName>
+    <RootNamespace>FabledomLetters</RootNamespace>
+    <Version>0.2.1</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(ManagedDir)\Unity.Localization.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Unity.ResourceManager.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Assembly-ComponentSaveSystem.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Unity.TextMeshPro.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Sirenix.Serialization.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\AK.Wwise.Unity.API.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\AK.Wwise.Unity.API.WwiseTypes.dll" Private="false" />
+  </ItemGroup>
+</Project>
+
