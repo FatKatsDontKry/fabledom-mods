@@ -35,7 +35,7 @@ The log is `BepInEx/LogOutput.log` in your Fabledom folder (Steam: right-click F
 | --- | --- |
 | `src/` | The source of every shipped plugin, one C# project each: `FabledomTailor` (Luxuries), `FabledomFixes`, `FabledomLetters`, `FabledomPerformance`, `FabledomSickness`. |
 | `release/` | The README and page text of each download. The zips themselves are on Releases, not in the repository. |
-| `tools/` | `package_release.py`, which builds a release zip from the installed DLLs and checks each against its build, and the icons and textures the Luxuries zip ships. `check_harmony_overloads.py` scans the patches for ambiguous by-name targets (it needs the game's decompiled code beside it, which is not included). |
+| `tools/` | `package_release.py`, Tools for building and packaging the downloads; players need none of them. |
 
 ## Rights
 
