@@ -1,0 +1,59 @@
+name: Bug report
+description: Something looks wrong in the game with a mod installed.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The log is what gets it fixed: `BepInEx/LogOutput.log` in your Fabledom folder (Steam: right-click Fabledom, Manage, Browse local files). It is rewritten every time the game starts, so copy it out before you start the game again.
+  - type: dropdown
+    id: mod
+    attributes:
+      label: Mod
+      description: Which download, and which DLL if you know.
+      options:
+        - Luxuries: Food and Finery (FabledomTailor)
+        - Fixes and Letters, Fixes (FabledomFixes)
+        - Fixes and Letters, Letters (FabledomLetters)
+        - Fixes and Letters, Performance (FabledomPerformance)
+        - Fixes and Letters, Sickness (FabledomSickness)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: mod_version
+    attributes:
+      label: Mod version
+      description: From the zip's name, or the `Loading [Fabledom ...` line near the top of the log.
+      placeholder: "0.9.1"
+    validations:
+      required: true
+  - type: input
+    id: game_version
+    attributes:
+      label: Game build and store
+      description: The build number at the bottom of the game's Settings screen, and where you bought it.
+      placeholder: "1.084, Steam"
+    validations:
+      required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: What you were doing, what you expected, and what you saw instead. Population, difficulty and whether it is a save from before the mod all help.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Drag `BepInEx/LogOutput.log` into this box to attach it. If it is too big to attach, paste the lines around the first red `[Error` in it.
+      placeholder: Drop the log file here.
+    validations:
+      required: true
+  - type: textarea
+    id: other_mods
+    attributes:
+      label: Other mods installed
+      description: Everything else in `BepInEx/plugins`, if anything.
