@@ -1,6 +1,6 @@
 # Fabledom Fixes and Letters
 
-Four Fabledom mods in one download: bug fixes and late-game performance for the base game, the family and sister letters put back on a chain that works, and two optional extras that ship switched off, Performance and Sickness. Each is its own DLL with its own config, so you can run any of them without the others.
+Four Fabledom mods in one download: bug fixes and late-game performance for the base game, the family and sister letters put back on a chain that works, and two optional extras, Performance and Sickness. Performance works as soon as its DLL is installed; Sickness ships switched off. Each is its own DLL with its own config, so you can run any of them without the others.
 
 By FatKatsDontKry (github.com/FatKatsDontKry). Fixes 0.5.1, Letters 0.2.1, Performance 0.4.0, Sickness 0.1.0. Made and tested by one person; see "Before you install" below.
 
@@ -35,15 +35,15 @@ The base game's family and sister letters were designed as chains but never actu
 
 **Existing saves:** on the first load the mod works out from the letters you have already answered where each chain stands, and clears the old permanent locks.
 
-## Fabledom Performance (off by default)
+## Fabledom Performance (optional)
 
-Extra late-game speed for very large kingdoms, beyond what Fixes does. Off until you turn it on in `fab.fabledomperformance.cfg`, because it trades a little fidelity for frame time:
+Extra late-game speed, beyond what Fixes does. It works as soon as `FabledomPerformance.dll` is in `plugins` (leave the DLL out if you don't want it), and each part can be switched off in `fab.fabledomperformance.cfg`:
 
-- **Walker ground check.** Every walking fabling casts a ray to the ground on every physics step; at 2,000 fablings that is about 10,000 raycasts a frame. The mod spaces those checks out, or turns them off so walkers follow the height of their path instead, with a little clipping on slopes.
+- **Walker ground check.** Every walking fabling casts a ray to the ground on every physics step; at 2,000 fablings that is about 10,000 raycasts a frame. The mod can space those checks out (`GroundCheckEverySteps`; the default of 1 keeps the game's every step), or turn them off so walkers follow the height of their path instead, with a little clipping on slopes (`GroundCheck`; the default, `Auto`, turns them off only above `AutoAbovePopulation`, 1,000 fablings).
 - **Fast storage lookups.** The searches every hauler, head of household and shopkeeper runs across the town's stores are cached instead of recomputed each time.
 - **Log quiet.** Known-harmless messages the game writes thousands of times are dropped before Unity formats them, and a repeated failed lookup is skipped.
 
-No gameplay changes. If you see a fabling floating or sunk on a hill, that is the ground check; turn it back on.
+No gameplay changes. If you see a fabling floating or sunk on a hill, that is the ground check; set `GroundCheck = On` and `GroundCheckEverySteps = 1`.
 
 ## Fabledom Sickness (off by default)
 
@@ -60,7 +60,7 @@ These mods were built and tested by one person, on their own saves, over several
 ## Installing
 
 1. Install BepInEx 5 for Fabledom (the 64-bit x64 build), run the game once, and close it.
-2. Copy `FabledomFixes.dll` and `FabledomLetters.dll` into `Fabledom/BepInEx/plugins/`. Either alone is fine. `FabledomPerformance.dll` and `FabledomSickness.dll` go in the same folder if you want them; they do nothing until switched on in their configs.
+2. Copy `FabledomFixes.dll` and `FabledomLetters.dll` into `Fabledom/BepInEx/plugins/`. Either alone is fine. `FabledomPerformance.dll` and `FabledomSickness.dll` go in the same folder if you want them. Performance works as soon as it is there; Sickness does nothing until switched on in its config.
 3. Start the game. The config files (`fab.fabledomfixes.cfg`, `fab.fabledomletters.cfg`, and one each for Performance and Sickness) are written in `BepInEx/config/` on the first run. To check they loaded, look near the top of `Fabledom/BepInEx/LogOutput.log` for lines beginning `Loading [Fabledom Fixes` and `Loading [Fabledom Letters`.
 
 **Updating** is step 2 again, over the old files. A saved config keeps its values; if a default changes, the release notes say which lines to look at.
@@ -73,7 +73,7 @@ These mods were built and tested by one person, on their own saves, over several
 | -------------------------- | -------------------------------------------------------------------- |
 | `FabledomFixes.dll`        | the bug fixes and the late-game performance work                     |
 | `FabledomLetters.dll`      | the family and sister letter chains and the letter draw              |
-| `FabledomPerformance.dll`  | extra frame time for very large kingdoms; off until switched on      |
+| `FabledomPerformance.dll`  | extra frame time for large kingdoms; works once installed            |
 | `FabledomSickness.dll`     | sickness that scales with population; off until switched on          |
 | `README.md`                | this file                                                            |
 

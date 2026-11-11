@@ -9,7 +9,7 @@ Both are on the [Releases](https://github.com/FatKatsDontKry/fabledom-mods/relea
 | Download | What |
 | --- | --- |
 | **Luxuries: Food and Finery** | The upper classes get demanding: garments, food variety, and three buildings cut from the game's files come back to supply them (the Sheep farm, the Tailor, the Confectionery). |
-| **Fixes and Letters** | Four mods in one zip, each its own DLL: bug fixes for large kingdoms and the Marketplace, the family and sister letter chains, and two optional extras (Performance, Sickness) off by default. |
+| **Fixes and Letters** | Four mods in one zip, each its own DLL: bug fixes for large kingdoms and the Marketplace, the family and sister letter chains, and two optional extras (Performance, which works once installed, and Sickness, off by default). |
 
 **Luxuries is in beta (0.9.x):** expect balance changes, and keep a backup of your saves. Fixes and Letters are earlier still (0.x) and change things deep in the game's hauling and housing code; the same advice applies.
 
