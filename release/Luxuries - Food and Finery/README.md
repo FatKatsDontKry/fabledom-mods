@@ -2,7 +2,7 @@
 
 A Fabledom mod. The upper classes are more demanding: nobles want new clothes, and commoners and nobles both want a varied table. It revives three buildings cut from the game's files, the Sheep farm, the Tailor and the Confectionery, and adds wool, garments and pastry to go with them.
 
-By FatKatsDontKry (github.com/FatKatsDontKry). Version 0.9.1, a beta.
+By FatKatsDontKry (github.com/FatKatsDontKry). Version 0.9.2, a beta.
 
 ## Before you install
 
@@ -59,7 +59,7 @@ The `icons` folder must sit next to the dll under `plugins`; the mod reads its t
 
 **Garments.** Nobles want a new garment every 25 days on Cruel, 30 on Challenge, 35 on Classic and 40 on Calm; once you have more than 10 nobles, a share of commoner houses want one too (3% of houses per noble over 10, up to 30%), every 55 days on Cruel, 60 on Challenge and Classic, 75 on Calm. A house that has gone without shows a "no garments" marker on its roof, and after five days of grace the resident is unhappy: a noble -10, growing by another 10 every 20 days without, up to -50; a commoner -5. A commoner whose household is clothed gets +5. The palace staff and the heads of condominium fetch garments along with food. The Town shop can be set to sell garments, which is how they reach commoner houses, and it can sell pastry too, so the heads of condominium have it close at hand. Giovanni's feast is a wardrobe holiday: for its 50 days his traders clothe everyone, the garment clocks stand still, anyone going without is dressed on the first day, and nothing is taken from the shelves, so the Tailors' output goes to restocking. A counter-play for a letter that wants 150 garments at once.
 
-**Food variety.** A commoner wants 3 different kinds of food across their last 4 meals; a noble 3 of 5 on Calm, 4 of 6 on Classic, 4 of 5 on Challenge, 5 of 6 on Cruel. Fewer is a happiness penalty (-10 commoners, -20 nobles) until the next varied meal. To make this fair, the shelves change: Town houses hold pastry, fish, egg, bread and pork in small amounts so they cycle; the living quarters hold egg, bread, pastry, pork and grape juice. Fablings eat the kind they have gone longest without, and the heads of condominium and palace staff fetch a missing kind for any house that is short, after any coal run, unless there is no coal anywhere to fetch. Agnes's feast resets everyone's streak.
+**Food variety.** A commoner wants 3 different kinds of food across their last 4 meals; a noble 3 of 5 on Calm, 4 of 6 on Classic, 4 of 5 on Challenge, 5 of 6 on Cruel. Fewer is a happiness penalty (-10 commoners, -20 nobles) until the next varied meal. To make this fair, the shelves change: Town houses hold pastry, fish, egg, bread and pork in small amounts so they cycle; the living quarters hold egg, bread, pastry, pork and grape juice. Fablings eat the kind they have gone longest without, and the heads of condominium and palace staff fetch a missing kind for a house only while it holds as many kinds as its residents want or fewer, until it holds one more: after any coal run, unless there is no coal anywhere to fetch, and first of all for a house whose residents are already on the penalty. Agnes's feast resets everyone's streak.
 
 **The royal advisors write.** Six letters introduce all this as your kingdom grows: a warning at Town that commoners will soon want variety, a quest at Big town to build a Sheep farm, a reminder when the variety rule starts, a quest at Small city to build a Tailor and make 20 garments, a word when your first noble arrives, and another when your 11th does. The quests work like the game's own advisor quests: 90 days, 10 nobility. Each letter comes once; a save already past that point never gets it.
 
@@ -79,7 +79,7 @@ Everything is in `fab.fabledomtailor.cfg`. The sections, and the lines most peop
 - `[Confectionery]`: `Enabled`, `UnlockAtPopulation` (150), cost (20 plank, 30 brick), `CornerEntrance`, the pastry recipe (`PastryEggs`, `PastryFlour`, `PastryBatch`, `PastrySeconds`, `PastryHunger`), `PastryTradeValue`, `Desirability` (+20) and its range, the chimney smoke's place and size.
 - `[Recipes]`: wool (3 grain make 2 in 87 s) and garments (3 wool, 90 s).
 - `[Garments]`: `Demand` (off turns the whole garment side off), `Days` (noble/commoner days between garments by difficulty), `SharePerNoble`, `FreeNobles`, `ShareCap`, `GraceDays` (5), the penalties, `FeastHoliday` (the feast that clothes everyone; giovanniFeast).
-- `[Food variety]`: `Enabled`, `SameFoodPenalty`, `CommonerVarietyKinds`/`Meals` (3 of 4), `NobleVariety` by difficulty, `ShelfSwaps` and `TownHouseShelves` (which kinds the houses shelve and how many), `QuartersFoodTrigger`, `CondoHeads` (3).
+- `[Food variety]`: `Enabled`, `SameFoodPenalty`, `CommonerVarietyKinds`/`Meals` (3 of 4), `NobleVariety` by difficulty, `ShelfSwaps` and `TownHouseShelves` (which kinds the houses shelve and how many), `QuartersFoodTrigger`, `CondoHeads` (3), `SpareKinds` (1: how many kinds over the rule a fetching run stocks a house to).
 - `[Sheep letter]`: `Mode`, `RepeatDays` (275), `RepeatDaysInNeed` (110), `MinNobility`.
 - `[Letters]`: `Introductions` (the advisors' letters, on), `ReminderDaysAfterBigTown` (15).
 - `[Noble letters]`: `Enabled`, and the amounts each letter asks for.

@@ -10,7 +10,7 @@ namespace FabledomTailor
 {
     // The sheep letter (Jess, 2026-10-06): with the rivalry game absent, stealing cannot be the only source of extra
     // herds, so a copy of the game's "More piggies" letter offers a Sheep herd instead. Conditions: at least 5
-    // nobility and a Sheep farm. It re-arms 250 days after it is answered and then waits for the letter draw, like
+    // nobility and a Sheep farm. It re-arms 275 days after it is answered (110 while someone goes without) and then waits for the letter draw, like
     // the pigs (330 for them). A guaranteed offer fires the first time a garment happiness penalty appears. Price as
     // the pigs': coin times the milestone multiplier, or nobility. The pig letter is found by what it does (its
     // action adds a Pig herd), not by its key, and the herd placed is the game's own world-event drop.
@@ -19,8 +19,7 @@ namespace FabledomTailor
     {
         internal const string Key = "fabSheepHerd";
         internal const string Notice = "fabSheepHerdNotice";   // the top-bar notice with a locate button when the flock arrives
-        private static readonly MethodInfo Clone = typeof(object).GetMethod("MemberwiseClone", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static WorldEventActionData Copy(WorldEventActionData a) => (WorldEventActionData)Clone.Invoke(a, null);
+        private static WorldEventActionData Copy(WorldEventActionData a) => ModText.Clone(a);
 
         // On: the letter exists. Auto: only when the Rivals plugin is not loaded (stealing is the route then).
         internal static bool Enabled()
@@ -159,7 +158,7 @@ namespace FabledomTailor
                 if (saveableWorldEvent == null || saveableWorldEvent.key != Key || DataManager.Instance == null) return;
                 var letter = DataManager.Instance.worldEventSoData.FirstOrDefault(e => e != null && e.key == Key);
                 if (letter == null) return;
-                bool inNeed = Garments.S.Residents.Values.Any(c => c != null && c.Unclothed >= Plugin.GarmentGraceDays.Value);
+                bool inNeed = Garments.AnyoneInNeed();
                 letter.daysBetweenRepeat = inNeed ? Plugin.SheepLetterRepeatDaysInNeed.Value : Plugin.SheepLetterRepeatDays.Value;
                 bool herd = actionIndex >= 0 && actionIndex < actionDatas.Count && actionDatas[actionIndex] != null && actionDatas[actionIndex].addWorldObjectInRealm;
                 Plugin.Log.LogInfo($"Tailor: sheep letter answered ({(herd ? "a herd bought" : "declined or postponed")}, {(inNeed ? "with" : "without")} a garment penalty): next in {letter.daysBetweenRepeat} days.");
@@ -180,7 +179,7 @@ namespace FabledomTailor
                 if (letter == null) return;
                 int today = DateTimeManager.Instance.GetTotalDaysTranspired();
                 if (today == lastForcedDay) return;
-                bool inNeed = Garments.S.Residents.Values.Any(c => c != null && c.Unclothed >= Plugin.GarmentGraceDays.Value);
+                bool inNeed = Garments.AnyoneInNeed();
                 if (!inNeed) return;
                 if (KingdomManager.Instance.nobility < letter.minNobility) return;
                 if (!WorldObject.Instances.Any(w => w != null && w.data == Tailor.FarmData)) return;

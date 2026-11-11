@@ -11,7 +11,7 @@ namespace FabledomTailor
     {
         public const string Guid = "fab.fabledomtailor";
         public const string Name = "Fabledom Tailor";
-        public const string Version = "0.9.1";
+        public const string Version = "0.9.2";
 
         internal static Plugin Instance;
         internal static ManualLogSource Log;
@@ -24,22 +24,22 @@ namespace FabledomTailor
         internal static ConfigEntry<string> FeastHoliday;
         internal static ConfigEntry<string> TradeWool, TradeGarments;
         internal static ConfigEntry<bool> PenWalkable, TradeMirrorGrapes;
-        internal static ConfigEntry<string> SheepLetterMode, TownHouseShelves, ShelfSwaps, QuartersShelves, TownHouseOrder, VarietyFromMilestone;
+        internal static ConfigEntry<string> SheepLetterMode, TownHouseShelves, ShelfSwaps, QuartersShelves, TownHouseOrder, VarietyFromMilestone, QuartersExtraShelves, ExtraFoods, QuartersLastShelves;
         internal static ConfigEntry<bool> ConfectioneryOn, ConfCornerEntrance, UpgradePoolsOn, IntroLettersOn;
         internal static ConfigEntry<int> IntroReminderDays;
         internal static ConfigEntry<int> GarmentsFromUpgrade;
         internal static ConfigEntry<string> ConfGround;
         internal static ConfigEntry<int> ConfectioneryUnlockPopulation, ConfWood, ConfStone, ConfPlank, ConfBrick, ConfConstructionSpots, PastryEggs, PastryFlour, PastryBatch, PastryHunger, ConfDesirability, ConfDesirabilityRange, PastryStore;
         internal static ConfigEntry<float> PastrySeconds, PastryTradeValue, SmokeX, SmokeY, SmokeZ, SmokeScale;
-        internal static ConfigEntry<bool> FoodVariety, SameFoodPenalty, HeadSampler, ChainLog, MealWatch, HappinessBreakdown, FullLoads;
+        internal static ConfigEntry<bool> FoodVariety, SameFoodPenalty, HeadSampler, ChainLog, MealWatch, HappinessBreakdown, FullLoads, Verbose;
         internal static ConfigEntry<bool> NobleLettersOn;
         internal static ConfigEntry<int> FashionGarments, FashionPastries, WardrobeGarments, WardrobePork, WardrobeEggs, PastriesQuestAmount;
-        internal static ConfigEntry<int> CondoHeads, SheepFarmUnlockPopulation, TailorUnlockPopulation, QuartersFoodTrigger, CommonerVarietyKinds, CommonerVarietyMeals;
+        internal static ConfigEntry<int> CondoHeads, SheepFarmUnlockPopulation, TailorUnlockPopulation, QuartersFoodTrigger, CommonerVarietyKinds, CommonerVarietyMeals, VarietySpareKinds;
         internal static ConfigEntry<string> NobleVariety;
         internal static ConfigEntry<float> SameFoodCommoner, SameFoodNoble;
         internal static ConfigEntry<int> SheepLetterRepeatDays, SheepLetterRepeatDaysInNeed, SheepLetterNobility;
         internal static ConfigEntry<float> TradeMirrorShare, FrontSpotX, FrontSpotZ, PenSpotBack, SheepKeepAway, SheepGap;
-        internal static ConfigEntry<int> WinterGrainPerDay, FarmGrainStore, WinterFillTo, WinterRunDaysEarly, BuildGraceDays;
+        internal static ConfigEntry<int> WinterGrainPerDay, FarmGrainStore, WinterFillTo, GrainKeep, WinterRunDaysEarly, BuildGraceDays;
         internal static ConfigEntry<float> WinterRecoveryCalm, WinterRecoveryClassic, WinterRecoveryChallenge, WinterRecoveryCruel;
         internal static ConfigEntry<float> TroughX, TroughZ, TroughWidth, TroughLength;
         internal static ConfigEntry<float> ShearSwingSeconds;
@@ -55,7 +55,7 @@ namespace FabledomTailor
         internal static ConfigEntry<bool> TailorSecondLine;
         internal static ConfigEntry<int> SheepFirstMin, SheepFirstMax;
         internal static ConfigEntry<float> SheepWanderMin, SheepWanderMax, SheepCentreShiftX, PenMinX, PenMaxX, PenMinZ, PenMaxZ;
-        internal static ConfigEntry<float> LineX, LineZ, LineYaw, BannerX, BannerZ, CutZ;
+        internal static ConfigEntry<float> LineX, LineZ, LineYaw, BannerX, BannerZ;
         internal static ConfigEntry<int> WoolGrain, WoolBatch, GarmentWool;
         internal static ConfigEntry<float> WoolSeconds, GarmentSeconds;
 
@@ -101,7 +101,6 @@ namespace FabledomTailor
             Line2Yaw = Config.Bind("Tailor look", "Line2Yaw", 111f, "Second line turn in degrees.");
             Line2Variant = Config.Bind("Tailor look", "Line2Variant", "house_attachments_cloth_line_1", "Mesh for the second line: the game has house_attachments_cloth_line, _1 and _3 (different washing on the line).");
             TailorGround = Config.Bind("Tailor look", "Ground", "STONE_TILES", "Ground painted under the Tailor, which also clears the brush: STONE_TILES (paving), STONE_ROAD, GRAVEL_ROAD, DIRT (the Cafe's), GRASS (the Embassy's), GARDEN.");
-            CutZ = Config.Bind("Tailor look", "CutFrontBeyond", -1f, "Pieces of the cafe mesh lying wholly in front of this line (the umbrella and tables) are removed.");
             // The cut data's recipes were 3 grain -> 1 wool in 30 s and 3 wool -> 1 garment in 20 s, which lets one tailor
             // eat the wool of four farms; these are the agreed numbers (see fabledom-mod-tailor.md).
             // The winter rule (Jess, 2026-10-05): see Winter.cs
@@ -141,7 +140,8 @@ namespace FabledomTailor
             SmokeY = Config.Bind("Confectionery", "SmokeY", 24.5f, "The chimney smoke's height.");
             SmokeZ = Config.Bind("Confectionery", "SmokeZ", 1.6f, "The chimney smoke's position along the building.");
             SmokeScale = Config.Bind("Confectionery", "SmokeScale", 1.5f, "Size of the chimney smoke against the Bakery's (Jess: it's a big chimney; 0 = no smoke).");
-            WinterFillTo = Config.Bind("Sheep farm", "WinterFillTo", 30, "At the start of winter (see WinterRunDaysEarly), a farm with less grain than this sends its worker for more at once, until it holds this much.");
+            WinterFillTo = Config.Bind("Sheep farm", "WinterFillTo", 45, "A grain fill runs until the farm holds this many (45: Jess, 2026-11-08, a winter and the start of spring on Cruel); a fill starts when the store drops below GrainKeep, and once on the last day of autumn (WinterRunDaysEarly) if the store is under this.");
+            GrainKeep = Config.Bind("Sheep farm", "GrainKeep", 5, "Below this much grain the farm starts a fill to WinterFillTo, in any season (Jess, 2026-11-08: the sheep have a penalty for standing empty, so they fetch sooner than the game's workers).");
             WinterRunDaysEarly = Config.Bind("Sheep farm", "WinterRunDaysEarly", 1, "Days before winter the grain run starts: 1 = the last day of autumn (Jess, 2026-10-26), so the ration is in the barn when the first winter day takes it; 0 = winter day 1.");
             BuildGraceDays = Config.Bind("Sheep farm", "BuildGraceDays", 5, "Days after a Sheep farm is finished during which the flock cannot go hungry, so a farm finished in winter has time to fetch grain.");
 
@@ -185,19 +185,24 @@ namespace FabledomTailor
             SameFoodPenalty = Config.Bind("Food variety", "SameFoodPenalty", true, "The variety rule's happiness penalty: a commoner or noble whose last few meals held too few kinds of food (CommonerVarietyKinds/Meals, NobleVariety) loses happiness (SameFoodCommoner/SameFoodNoble, below) until a varied meal. Peasants do not mind.");
             QuartersFoodTrigger = Config.Bind("Food variety", "QuartersFoodTrigger", 120, "The palace staff fetch food when the living quarters' shelves hold less than this much hunger in total (the game's 30 suits a town house, not a court).");
             FullLoads = Config.Bind("Food variety", "FullLoads", true, "A head of condominium or palace keeper goes for food when the shelves are physically short, not when the last items on them are spoken for by residents about to eat (the game's rule, which at a meal rush sent heads across town with room for a single egg; 2026-10-23). The residents still eat what they reserved; the run comes one meal later with room for a full load.");
-            CondoHeads = Config.Bind("Food variety", "CondoHeads", 3, "Heads of household a Condominium employs (the game's is 3; 4 gives a spare pair of hands for food runs in towns with poor shops).");
+            CondoHeads = Config.Bind("Food variety", "CondoHeads", 3, "Heads of household a Condominium employs, never lowered below the game's 3 (4 gives a spare pair of hands for food runs in towns with poor shops).");
             SameFoodCommoner = Config.Bind("Food variety", "SameFoodCommoner", 10f, "Happiness a commoner loses while on a same-food streak.");
             SameFoodNoble = Config.Bind("Food variety", "SameFoodNoble", 20f, "Happiness a noble loses while on a same-food streak.");
             VarietyFromMilestone = Config.Bind("Food variety", "FromMilestone", "BIG_TOWN", "The population milestone the variety rule starts at (Jess, 2026-10-17: Big town, 120). Before it no meal is judged and no variety errand runs. Names: HAMLET, SMALL_VILLAGE, VILLAGE, BIG_VILLAGE, SMALL_TOWN, TOWN, BIG_TOWN, SMALL_CITY, CITY, BIG_CITY, SMALL_KINGDOM, KINGDOM; ZERO = from the start.");
+            VarietySpareKinds = Config.Bind("Food variety", "SpareKinds", 1, "A variety run, once begun (the house down to as many kinds as its residents want, or fewer), goes on until the shelf holds this many kinds more than they want, or every kind it takes if that is fewer (Jess, 2026-11-11: \"the number the residents demand +1\").");
             CommonerVarietyKinds = Config.Bind("Food variety", "CommonerVarietyKinds", 3, "Kinds of food a commoner wants across their last CommonerVarietyMeals meals; fewer is the penalty.");
             CommonerVarietyMeals = Config.Bind("Food variety", "CommonerVarietyMeals", 4, "Meals a commoner is judged over.");
             NobleVariety = Config.Bind("Food variety", "NobleVariety", "calm:3/5,classic:4/6,challenge:4/5,cruel:5/6", "Kinds of food a noble wants across their last meals, as kinds/meals by difficulty (Jess, 2026-10-18: Calm and Classic loosened; before, calm:3/4,classic:4/5,challenge:4/5,cruel:5/6). The living quarters shelve egg, pork, bread, pastry and grape juice (ShelfSwaps), so 5 means all of them.");
             ShelfSwaps = Config.Bind("Food variety", "ShelfSwaps", "Town house:vegetable>pastry,Town house:grapes>pastry,Palace living quarters:grapes>pastry", "The food split (Jess, 2026-10-13 and 16): shelves rekeyed as building:old>new, so commoners eat pastry, fish, egg, bread and pork and nobles egg, bread, pastry, pork and grape juice; nobody eats grapes at home (the grapes>pastry town-house entry converts houses from the one-day grapes version). Standing houses are rekeyed after a load; stock of the old kind is eaten down. Empty keeps the game's shelves.");
             TownHouseShelves = Config.Bind("Food variety", "TownHouseShelves", "pastry:10,egg:15,fish:15,bread:10,pork:5", "Food a town house holds of each kind, small enough that shelves empty and the heads bring something else (Jess, 2026-10-10). A size given for a swapped-out kind (vegetable, grapes) applies to its replacement. Empty keeps the game's shelves (vegetable 30, egg/fish/bread/pork 20).");
-            TownHouseOrder = Config.Bind("Food variety", "TownHouseOrder", "egg,fish,bread,pastry,pork,coal", "The order of a town house's shelves in its panel (Jess, 2026-10-16). Kinds not named keep their place after the named ones; empty keeps the game's order.");
+            TownHouseOrder = Config.Bind("Food variety", "TownHouseOrder", "egg,fish,bread,pastry,pork,garment,coal", "The order of a town house's shelves in its panel (Jess, 2026-10-16; garments before coal, 2026-11-10, as in the living quarters). Kinds not named keep their place after the named ones; empty keeps the game's order.");
+            QuartersLastShelves = Config.Bind("Food variety", "QuartersLastShelves", "garment,coal", "The shelves that come last in the living quarters' panel, in this order (Jess, 2026-11-09: garments, then coal at the end); every other kind stays before them in its own order. Empty keeps the storage's order.");
+            QuartersExtraShelves = Config.Bind("Food variety", "QuartersExtraShelves", "truffle:20", "Shelves the living quarters get for kinds they have none of (kind:size, comma-separated): the nobles' truffles from Rivals' truffle farm (2026-11-05). A kind that is not a resource in this game is skipped.");
+            ExtraFoods = Config.Bind("Food variety", "ExtraFoods", "truffle", "Kinds another plugin adds that count for variety (comma-separated); a house with no shelf for one never wants it, so truffles are the nobles' alone.");
             QuartersShelves = Config.Bind("Food variety", "QuartersShelves", "pastry:50", "Food the living quarters hold of each kind where it differs from the game's (egg/pork/bread/juice 50, grapes 100; the grapes shelf becomes pastry). Empty keeps the game's sizes.");
             MealWatch = Config.Bind("Diagnostics", "MealWatch", true, "Log any meal that lowers a fabling's hunger by more than the food eaten explains (Jess, 2026-10-20: a starving fabling seemed to fill up on one homegrown).");
-            HappinessBreakdown = Config.Bind("Diagnostics", "HappinessBreakdown", true, "With each visitor roll, log what makes up the kingdom's average happiness: every panel impactor summed over all fablings, who sits at the cap, and the class averages (Jess, 2026-10-22: \"what's pulling it down?\").");
+            Verbose = Config.Bind("Diagnostics", "Verbose", false, "Testing: the visitor roll, the variety trips and the daily variety and condo-head lines are logged; off, only first-use lines and faults are (Jess, 2026-11-02).");
+            HappinessBreakdown = Config.Bind("Diagnostics", "HappinessBreakdown", false, "With each visitor roll, log what makes up the kingdom's average happiness: every panel impactor summed over all fablings, who sits at the cap, and the class averages (Jess, 2026-10-22: \"what's pulling it down?\").");
             NobleLettersOn = Config.Bind("Noble letters", "Enabled", true, "Three noble letters for the new goods, in the game's own noble-letter series (Jess, 2026-10-22): A noble of fashion (garments and pastries now), A noble requesting a wardrobe and A noble requesting pastries (quests with no deadline).");
             FashionGarments = Config.Bind("Noble letters", "FashionGarments", 150, "Garments A noble of fashion asks for.");
             FashionPastries = Config.Bind("Noble letters", "FashionPastries", 50, "Pastries A noble of fashion asks for.");
@@ -238,7 +243,45 @@ namespace FabledomTailor
             VarietyFromMilestone.SettingChanged += (s, e) => Food.ConfigChanged();
             NobleVariety.SettingChanged += (s, e) => Food.ConfigChanged();
             GarmentDays.SettingChanged += (s, e) => Garments.ConfigChanged();
-            new Harmony(Guid).PatchAll(typeof(Plugin).Assembly);
+            // A decided default replaces a stored value once (the Rivals plugin's way): every line below is set when the stored
+            // ConfigVersion is older than its number, and the log says so. Add a version for each new batch; never renumber an old one.
+            try
+            {
+                var configVersion = Config.Bind("Tailor", "ConfigVersion", 0, "Raised by the mod when a decided default replaces a stored value (the log names each); not for editing.");
+                var batches = new (int version, (string section, string key, string value)[] lines)[]
+                {
+                    (1, new[] { ("Sheep farm", "WinterFillTo", "45") }),
+                    (2, new[] { ("Food variety", "TownHouseOrder", "egg,fish,bread,pastry,pork,garment,coal") }),   // Jess, 2026-11-10: garments before coal in a town house's panel too
+                };
+                int was = configVersion.Value; var set = new System.Collections.Generic.List<string>();
+                foreach (var b in batches)
+                {
+                    if (was >= b.version) continue;
+                    foreach (var (section, key, value) in b.lines)
+                    {
+                        var def = new ConfigDefinition(section, key);
+                        if (!Config.ContainsKey(def)) continue;
+                        var entry = Config[def];
+                        string before = entry.GetSerializedValue();
+                        if (before == value) continue;
+                        try { entry.SetSerializedValue(value); set.Add($"[{section}] {key} = {value} (was {before})"); } catch (System.Exception ex) { Log.LogWarning($"Tailor: config: setting [{section}] {key}: " + ex.Message); }
+                    }
+                    configVersion.Value = b.version;
+                }
+                if (configVersion.Value != was) { Config.Save(); Log.LogInfo($"Tailor: config version {was} -> {configVersion.Value}: {(set.Count > 0 ? string.Join("; ", set) : "nothing to change")}."); }
+            }
+            catch (System.Exception ex) { Log.LogWarning("Tailor: config version: " + ex.Message); }
+            // Each patch class on its own, so a patch Harmony refuses (a parameter name the game's method lacks; Jess's log of
+            // 2026-11-05, where PatchAll stopped at the first and left the rest of the plugin unpatched) costs that class alone.
+            {
+                var harmony = new Harmony(Guid); int applied = 0, failed = 0;
+                foreach (var type in AccessTools.GetTypesFromAssembly(typeof(Plugin).Assembly))
+                {
+                    try { var patched = harmony.CreateClassProcessor(type).Patch(); if (patched != null) applied += patched.Count; }
+                    catch (System.Exception ex) { failed++; Log.LogError($"Tailor: Patch class {type.FullName} refused; the rest still load: " + ex.Message); }
+                }
+                Log.LogInfo($"Tailor: Harmony: {applied} patches applied{(failed > 0 ? $", {failed} class(es) refused (see above)" : "")}.");
+            }
             StartCoroutine(Shearer.Patrol());
             StartCoroutine(Food.Sample());
             Log.LogInfo("Fabledom Tailor loaded.");

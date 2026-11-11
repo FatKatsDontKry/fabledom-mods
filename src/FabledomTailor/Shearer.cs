@@ -22,7 +22,7 @@ namespace FabledomTailor
         private static Transform Spot(Worker w)
         {
             var wps = w.workPlace.GetComponent<UnitWaypoints>();
-            var parent = wps != null ? Traverse.Create(wps).Field("waypointParent").GetValue<GameObject>() : null;
+            var parent = Tailor.WaypointParent(wps);
             return parent != null ? parent.transform.Find("Fab work spot 0") : null;
         }
 
@@ -51,6 +51,7 @@ namespace FabledomTailor
             while (true)
             {
                 yield return new WaitForSecondsRealtime(5f);
+                try { AtSpot.RemoveWhere(u => u == null); } catch { }   // a shearer gone (dead, destroyed) leaves the spot's record
                 try
                 {
                     if (Worker.Instances == null) continue;
@@ -229,7 +230,7 @@ namespace FabledomTailor
             try
             {
                 var farm = worker.workPlace.GetComponent<AnimalHerdFarm>();
-                var herd = farm != null ? Traverse.Create(farm).Field("animalHerd").GetValue<AnimalHerd>() : null;
+                var herd = Tailor.HerdOf(farm);
                 if (herd == null || herd.animals == null) return;
                 var here = shearer.transform.position;
                 foreach (var a in herd.animals)
@@ -251,7 +252,7 @@ namespace FabledomTailor
             try
             {
                 var farm = worker.workPlace.GetComponent<AnimalHerdFarm>();
-                var herd = farm != null ? Traverse.Create(farm).Field("animalHerd").GetValue<AnimalHerd>() : null;
+                var herd = Tailor.HerdOf(farm);
                 if (herd == null || herd.animals == null) return null;
                 var choices = herd.animals.FindAll(a => a != null && a != not);
                 if (choices.Count == 0) choices = herd.animals.FindAll(a => a != null);

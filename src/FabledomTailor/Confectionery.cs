@@ -167,9 +167,17 @@ namespace FabledomTailor
                 Borrow(root, "Mesh - Construction");
                 CornerEntrance(root);
                 Smoke(__instance, main != null ? main.transform : root);
+                if (dressLogs++ < 2)
+                {
+                    // what the building wears, for the log (Jess, 2026-11-03: "the confectionery is impressively broken in its rendering")
+                    var mr = main != null ? main.GetComponent<MeshRenderer>() : null;
+                    string mats = mr != null && mr.sharedMaterials != null ? string.Join(", ", mr.sharedMaterials.Select(m => m != null ? m.name + " [" + (m.shader != null ? m.shader.name : "no shader") + "]" : "null")) : "no renderer";
+                    Plugin.Log.LogInfo($"Confectionery dressed: mesh '{(main != null && main.sharedMesh != null ? main.sharedMesh.name + "' (" + main.sharedMesh.vertexCount + " vertices, " + main.sharedMesh.subMeshCount + " submeshes, bounds " + main.sharedMesh.bounds.size.ToString("F1") + ")" : "none'")}, own look {ownLook}, materials {mats}; holder at {(main != null ? main.transform.localPosition.ToString("F1") + " scale " + main.transform.localScale.ToString("F1") : "?")}, pawnbroker holder {(pawnMain != null ? pawnMain.transform.localPosition.ToString("F1") + " scale " + pawnMain.transform.localScale.ToString("F1") : "missing")}; renderers under the building: {string.Join(", ", root.GetComponentsInChildren<Renderer>(true).Select(r => r.gameObject.name + (r.enabled ? "" : " (off)")))}.");
+                }
             }
             catch (System.Exception ex) { Plugin.Log.LogError("Confectionery dressing failed: " + ex); }
         }
+        private static int dressLogs;
 
         // Desirability (Jess, 2026-10-16: "+20 radius 11. It is basically da bomb"; the Cafe is +10 at 12, the Carousel
         // +20 at 8). The cut data has no influence; the Bakery's (+5 at 10) is copied and retuned, and the prefab gets
@@ -215,7 +223,7 @@ namespace FabledomTailor
                     if (shapes != null) shapes.rangeSelf = range;
                 }
                 if (!influenced.Contains(data)) influenced.Add(data);
-                Plugin.Log.LogInfo($"{label}: desirability +{effect} in a radius of {range} (components {(target.GetComponent<AreaInfluencer>() != null ? "in place" : "missing")}).");
+                Plugin.Log.LogInfo($"{label}: desirability {effect:+0;-0} in a radius of {range} (components {(target.GetComponent<AreaInfluencer>() != null ? "in place" : "missing")}).");
             }
             catch (System.Exception ex) { Plugin.Log.LogWarning(label + ": desirability: " + ex.Message); }
         }
@@ -335,10 +343,10 @@ namespace FabledomTailor
             shopMesh = Tailor.LoadObj("confectionery_shop.obj", "Fab confectionery shop", (t, tris, subCount) =>
             {
                 // Jess's images are the Pawnbroker's block of atlas_002 plus a strip under it for the chimney's masonry
-                // (tools/icons/confectionery/README.md): pixels 4099..5109 across and 3075..5201 down (the block, the masonry strip, then the awnings' own patch; 2026-10-21) on the 8192 sheet,
+                // (tools/icons/confectionery/README.md): pixels 4099..5109 across and 3075..5942 down (the block, the masonry strip, the Cafe roof band, the awnings' own patch, then the sign's; 2026-10-21, roof and sign 2026-10-31) on the 8192 sheet,
                 // so the uv maps from that box to 0..1. Group 1 is the atlas submesh; group 0 the interior-mapped glass.
                 if (subCount < 2 || Icons.LoadTexture("confectionery_albedo", false) == null) return;
-                const float S = 8192f, x0 = 4099f, x1 = 5109f, y0 = 3075f, y1 = 5201f;
+                const float S = 8192f, x0 = 4099f, x1 = 5109f, y0 = 3075f, y1 = 5942f;
                 float u0 = x0 / S, uw = (x1 - x0) / S, vb = 1f - y1 / S, vh = (y1 - y0) / S;
                 var done = new HashSet<int>();
                 foreach (var i in tris[1])

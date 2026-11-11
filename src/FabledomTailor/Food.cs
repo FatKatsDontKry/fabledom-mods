@@ -19,7 +19,10 @@ namespace FabledomTailor
     //    Nobody eats grapes at home.
     //  - Shelves and errands to match: town house shelves are small enough to cycle (TownHouseShelves), a fabling's own
     //    meal pick avoids the two remembered kinds, and heads and palace staff bring a missing kind to any house holding
-    //    fewer than three, lowest priority, except for a house whose resident is already on the penalty.
+    //    as many kinds as its residents want or fewer, until it holds one more than they want (SpareKinds; 2026-11-11;
+    //    it was every kind the shelf takes from 11-09, and fewer than wanted, then stop, before that), lowest priority, except for a house whose resident is already on the penalty.
+    //  - A record keeps one meal more than the window, and the nobles can be judged afresh on request (JudgeNobles:
+    //    Rivals, daily through Gastón's third date and when it moves the rule).
     //  - A sampler (HeadSampler, off by default, for tuning) logs once a day how the heads spend their time.
     [HarmonyPatch]
     internal static class Food
@@ -58,6 +61,7 @@ namespace FabledomTailor
                 }
                 ParseSwaps();
                 ResourceData Res(string key) => __instance.resourceSoData.FirstOrDefault(r => r != null && r.key == key);
+                AddExtraFoods(Res);
                 foreach (var data in new[] { townHouseData, quartersData })
                 {
                     var prefab = data != null ? Resources.Load<GameObject>(data.GetFullPath()) : null;
@@ -70,7 +74,7 @@ namespace FabledomTailor
             catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: food setup: " + ex.Message); }
         }
 
-        // The food split (Jess, 2026-10-13; ShelfSwaps): a town house's vegetable shelf becomes grapes and the quarters'
+        // The food split (Jess, 2026-10-13; ShelfSwaps): a town house's vegetable shelf becomes pastry and the quarters'
         // grapes shelf becomes pastry. Prefabs are rekeyed at setup; standing houses after a load (below), where the stock
         // of the old kind stays edible but has no slot, so nothing more is brought and it is eaten down over a few days.
         private static readonly List<(string building, string from, string to)> swaps = new List<(string, string, string)>();
@@ -106,6 +110,23 @@ namespace FabledomTailor
                     changed.Add($"{from}->{to}");
                 }
             }
+            // shelves a house lacks (QuartersExtraShelves: the nobles' truffles, 2026-11-05): a slot added for a kind no slot holds
+            var extraPlan = data == quartersData ? Plugin.QuartersExtraShelves.Value : null;
+            if (!string.IsNullOrWhiteSpace(extraPlan))
+            {
+                foreach (var kv in ParseShelves(extraPlan))
+                {
+                    if (st.resourcesCapacity.Any(s => s?.resourceAmountData?.resourceData != null && s.resourceAmountData.resourceData.key == kv.Key)) continue;
+                    var rd = res(kv.Key);
+                    if (rd == null) continue;   // the resource is another plugin's and may not be loaded
+                    // not retrievable, like the game's own food shelves in a dwelling (Jess, 2026-11-11: "Food in a dwelling place
+                    // should be locked down"): a retrievable shelf puts the quarters on the game's list of stores to fetch from,
+                    // and a granary worker carried 20 truffles off it
+                    st.resourcesCapacity.Add(new StorageResource { resourceAmountData = new ResourceAmountData(rd, kv.Value), isRetrievable = false, showWarningIfFull = false });
+                    if (standing && st.resourcesStored != null && !st.resourcesStored.Any(r => r != null && r.key == kv.Key)) st.resourcesStored.Add(new SaveableResourceAmountData(kv.Key, 0));
+                    changed.Add($"+{kv.Key} {kv.Value}");
+                }
+            }
             var plan = data == townHouseData ? Plugin.TownHouseShelves.Value : data == quartersData ? Plugin.QuartersShelves.Value : null;
             if (!string.IsNullOrWhiteSpace(plan))
             {
@@ -120,21 +141,48 @@ namespace FabledomTailor
                     slot.resourceAmountData.amount = amount;
                 }
             }
-            // The panel lists the shelves in the storage's own order (Jess, 2026-10-16: egg, fish, bread, pastry, pork, coal).
+            if (OrderShelves(st, data)) changed.Add("reordered");
+            return changed;
+        }
+
+        // The panel lists the shelves in the storage's own order. A town house's is given whole (Jess, 2026-10-16: egg, fish,
+        // bread, pastry, pork, coal; kinds not named follow). The living quarters' names only its last shelves (Jess,
+        // 2026-11-09: "coal is at the end and garments before that"): the foods keep their order, the truffle shelf added
+        // after coal joins them, then garments, then coal. Called when the shelves are planned and again when the garment
+        // shelf is added, which happens later (Garments.EnsureSlot). True when the order changed.
+        internal static bool OrderShelves(Storage st, WorldObjectData data)
+        {
+            if (st == null || st.resourcesCapacity == null || data == null) return false;
+            System.Func<string, int> rank;
             if (data == townHouseData && !string.IsNullOrWhiteSpace(Plugin.TownHouseOrder.Value))
             {
                 var order = Plugin.TownHouseOrder.Value.Split(',').Select(k => k.Trim()).Where(k => k.Length > 0).ToList();
-                int Rank(string key) { int i = order.IndexOf(key); return i < 0 ? order.Count : i; }
-                var before = st.resourcesCapacity.Select(s => s?.resourceAmountData?.resourceData?.key).ToList();
-                var sorted = st.resourcesCapacity.Select((s, i) => (s, i)).OrderBy(p => Rank(p.s?.resourceAmountData?.resourceData?.key)).ThenBy(p => p.i).Select(p => p.s).ToList();
-                if (!sorted.Select(s => s?.resourceAmountData?.resourceData?.key).SequenceEqual(before))
-                {
-                    st.resourcesCapacity.Clear();
-                    st.resourcesCapacity.AddRange(sorted);
-                    changed.Add("reordered");
-                }
+                rank = key => { int i = order.IndexOf(key); return i < 0 ? order.Count : i; };
             }
-            return changed;
+            else if (data == quartersData && !string.IsNullOrWhiteSpace(Plugin.QuartersLastShelves.Value))
+            {
+                var last = Plugin.QuartersLastShelves.Value.Split(',').Select(k => k.Trim()).Where(k => k.Length > 0).ToList();
+                rank = key => last.IndexOf(key);   // -1 for every kind not named: first, in the order they stand
+            }
+            else return false;
+            var before = st.resourcesCapacity.Select(x => x?.resourceAmountData?.resourceData?.key).ToList();
+            var sorted = st.resourcesCapacity.Select((x, i) => (x, i)).OrderBy(q => rank(q.x?.resourceAmountData?.resourceData?.key)).ThenBy(q => q.i).Select(q => q.x).ToList();
+            if (sorted.Select(x => x?.resourceAmountData?.resourceData?.key).SequenceEqual(before)) return false;
+            st.resourcesCapacity.Clear();
+            st.resourcesCapacity.AddRange(sorted);
+            return true;
+        }
+
+        // The kinds whose shelves are ours and not the game's: garments, and the quarters' extra shelves (truffles). The
+        // storage panel grows by the lines these add (StoragePanel).
+        private static string addedFrom; private static HashSet<string> added;
+        internal static HashSet<string> AddedKinds()
+        {
+            string plan = Plugin.QuartersExtraShelves.Value ?? "";
+            if (added != null && plan == addedFrom) return added;
+            addedFrom = plan;
+            added = new HashSet<string>(ParseShelves(plan).Keys) { "garment" };
+            return added;
         }
 
         // The prefab change does not reach houses the game spawns (Jess, 2026-10-21: a living quarters placed mid-session
@@ -191,7 +239,7 @@ namespace FabledomTailor
         // --- the same-food penalty -----------------------------------------------------------------
 
         // What a fabling remembers: the kinds in each of their last few meals (Meals, oldest first, kept to the class's
-        // count) and whether the penalty is on. Saved with the garment state by unit guid.
+        // count and one more) and whether the penalty is on. Saved with the garment state by unit guid.
         internal class Dish
         {
             public List<List<string>> Meals = new List<List<string>>();
@@ -204,12 +252,16 @@ namespace FabledomTailor
                 return order;
             }
         }
-        // Nobles by difficulty (Jess, 2026-10-10): 3 of 4 on Calm, 4 of 5 on Classic and Challenge, 5 of 6 on Cruel; commoners 3 of 4 everywhere.
+        // Nobles by difficulty (Jess, 2026-10-10, revised 2026-10-18): 3 of 5 on Calm, 4 of 6 on Classic, 4 of 5 on Challenge, 5 of 6 on Cruel; commoners 3 of 4 everywhere.
         // The config string is parsed once per difficulty band, and again if the setting changes in play (ConfigChanged).
         private static string nobleBand;
         private static (int kinds, int meals) nobleRule;
+        // Another plugin may tighten the nobles' rule for a while (Rivals: Gastón's third date, by reflection on this field);
+        // null is the config's rule.
+        internal static (int kinds, int meals)? RuleOverride;
         private static (int kinds, int meals) NobleRule()
         {
+            if (RuleOverride.HasValue) return RuleOverride.Value;
             string band = Winter.DifficultyBand();
             if (band == nobleBand) return nobleRule;
             (int kinds, int meals) rule = (4, 5);
@@ -251,9 +303,19 @@ namespace FabledomTailor
             if (!Garments.S.Dishes.TryGetValue(g, out var d) && create) Garments.S.Dishes[g] = d = new Dish();
             return d;
         }
+        // Gastón's feast (Rivals, "Gastón's Table"): the variety requirements count as met for commoners and nobles while it
+        // runs. The buff's key is Rivals' (theGourmetPrince + Feast); the meals keep being recorded, so the penalty comes
+        // back as it stood once the feast ends. Asked on every happiness tick, so the answer is kept for the frame.
+        private static int truceFrame = -1; private static bool truce;
+        internal static bool FeastTruce()
+        {
+            if (Time.frameCount == truceFrame) return truce;
+            truceFrame = Time.frameCount;
+            try { return truce = DataManager.Instance != null && DataManager.Instance.IsBuffActivated("theGourmetPrinceFeast"); } catch { return truce = false; }
+        }
         internal static bool Bored(Worker w)
         {
-            if (!Plugin.SameFoodPenalty.Value || w == null || w.fablingClass == FablingClass.PEASANT || !RuleActive()) return false;
+            if (!Plugin.SameFoodPenalty.Value || w == null || w.fablingClass == FablingClass.PEASANT || !RuleActive() || FeastTruce()) return false;
             var d = DishOf(w, false);
             return d != null && d.Penalty;
         }
@@ -320,10 +382,53 @@ namespace FabledomTailor
             if (w == null || kinds == null || kinds.Count == 0 || w.fablingClass == FablingClass.PEASANT || !RuleActive()) return;
             var d = DishOf(w, true);
             if (d == null) return;
-            int meals = Mathf.Max(1, MealsCounted(w.fablingClass)), want = KindsWanted(w.fablingClass);
+            int meals = Mathf.Max(1, MealsCounted(w.fablingClass));
             d.Meals.Add(new List<string>(kinds));
-            while (d.Meals.Count > meals) d.Meals.RemoveAt(0);
-            d.Penalty = d.Meals.Count >= meals && d.Meals.SelectMany(m => m).Distinct().Count() < want;   // no penalty until that many meals are on record
+            // one meal more than the window is remembered (Jess, 2026-11-09), so the record is whole the moment the window
+            // grows by a meal (Gastón's third date); the judging still looks only at the window's meals
+            while (d.Meals.Count > meals + 1) d.Meals.RemoveAt(0);
+            d.Penalty = Judged(d, w.fablingClass);
+        }
+
+        // The penalty a record earns under the class's current rule: too few kinds across the window's last meals; none
+        // until that many meals are on record.
+        private static bool Judged(Dish d, FablingClass c)
+        {
+            int meals = Mathf.Max(1, MealsCounted(c)), want = KindsWanted(c);
+            if (d == null || d.Meals.Count < meals) return false;
+            return d.Meals.Skip(d.Meals.Count - meals).SelectMany(m => m).Distinct().Count() < want;
+        }
+
+        // Every noble's penalty worked out afresh from their record under the rule as it stands now. A meal judges its
+        // eater, which is enough while the rule holds still; Rivals calls this (by reflection) each day of Gastón's third
+        // date and the moment that date moves the rule, when a record judged at the last meal may be judged wrongly
+        // (Jess, 2026-11-09: "we probably only need to judge the nobles every day during the quest, when it's a moving
+        // target"). Returns how many nobles are on the penalty afterwards; -1 when it could not be done.
+        private static int judgeLogs;
+        internal static int JudgeNobles(string why)
+        {
+            try
+            {
+                if (Garments.S == null || Worker.Instances == null || !RuleActive()) return -1;
+                int on = 0, turnedOn = 0, turnedOff = 0, nobles = 0;
+                foreach (var w in Worker.Instances)
+                {
+                    if (w == null || w.fablingClass != FablingClass.NOBLE) continue;
+                    var d = DishOf(w, false); if (d == null) continue;
+                    nobles++;
+                    bool now = Judged(d, FablingClass.NOBLE);
+                    if (now && !d.Penalty) turnedOn++; else if (!now && d.Penalty) turnedOff++;
+                    d.Penalty = now;
+                    if (now) on++;
+                }
+                if (judgeLogs < 6 || Plugin.Verbose.Value)
+                {
+                    judgeLogs++;
+                    Plugin.Log.LogInfo($"Tailor: {nobles} noble(s) judged afresh ({why}) under {KindsWanted(FablingClass.NOBLE)} kinds in {MealsCounted(FablingClass.NOBLE)} meals: {on} on the same-food penalty ({turnedOn} newly on, {turnedOff} newly off).");
+                }
+                return on;
+            }
+            catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: judging the nobles: " + ex.Message); return -1; }
         }
 
         // The kind on the shelf this fabling has gone longest without (never eaten lately first), else the given pick.
@@ -363,9 +468,9 @@ namespace FabledomTailor
             catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: dormancy hooks: " + ex.Message); }
         }
 
-        // The memory of fablings who are gone is dropped once a day.
-        [HarmonyPatch(typeof(WorldEventManager), "HandleStandardWorldEventsOnDayChange"), HarmonyPrefix]
-        private static void ForgetTheDead()
+        // The memory of fablings who are gone is dropped once a day (called from Garments.Daily).
+        private static bool forgetWarned;
+        internal static void ForgetTheDead()
         {
             try
             {
@@ -373,7 +478,7 @@ namespace FabledomTailor
                 var alive = new HashSet<string>(Worker.Instances.Select(Guid).Where(g => !string.IsNullOrEmpty(g)));
                 foreach (var g in Garments.S.Dishes.Keys.Where(g => !alive.Contains(g)).ToList()) Garments.S.Dishes.Remove(g);
             }
-            catch { }
+            catch (System.Exception ex) { if (!forgetWarned) { forgetWarned = true; Plugin.Log.LogWarning("Tailor: forgetting the dead's dishes: " + ex.Message); } }
         }
 
         // -10 for commoners, -20 for nobles (Jess, 2026-10-09; the game's own figure was -5 for both)
@@ -409,7 +514,15 @@ namespace FabledomTailor
 
         // --- the second-food run -------------------------------------------------------------------
 
-        private static readonly string[] Foods = { "vegetable", "egg", "fish", "bread", "pork", "grapes", "grapeJuice", "pastry" };   // grapes and juice too (Jess, 2026-10-10); pastry (2026-10-13)
+        private static string[] Foods = { "vegetable", "egg", "fish", "bread", "pork", "grapes", "grapeJuice", "pastry" };   // grapes and juice too (Jess, 2026-10-10); pastry (2026-10-13); ExtraFoods (truffles, 2026-11-05) joined at setup
+        // Foods another plugin adds (Rivals' truffles): on the list once the resource exists; a house with no shelf for one never wants it.
+        internal static void AddExtraFoods(System.Func<string, ResourceData> res)
+        {
+            var extra = (Plugin.ExtraFoods.Value ?? "").Split(',').Select(k => k.Trim()).Where(k => k.Length > 0 && !Foods.Contains(k)).ToList();
+            var added = extra.Where(k => res(k) != null).ToList();
+            if (added.Count > 0) { Foods = Foods.Concat(added).ToArray(); Plugin.Log.LogInfo("Tailor: foods on the variety list now: " + string.Join(", ", Foods) + "."); }
+            foreach (var k in extra.Except(added)) Plugin.Log.LogInfo($"Tailor: extra food '{k}' is not a resource in this game; not on the list.");
+        }
         private static int FoodKinds(Storage s) => Foods.Count(k => s.GetResourceStored(k) > 0);
         private static readonly HashSet<Storage> VarietyTargets = new HashSet<Storage>();
         internal static int VarietyRuns;
@@ -421,6 +534,32 @@ namespace FabledomTailor
 
         // The kinds a house lacks: nothing on the shelf and room for some.
         private static List<string> MissingKinds(Storage st) => Foods.Where(k => st.GetResourceStored(k) == 0 && st.GetRemainingCapacity(k) > 0).ToList();
+
+        // Whether a house is due a variety run (Jess, 2026-11-09: "variety runs start sooner"): the runs begin when the
+        // shelf holds as many kinds as its residents want, or fewer (it was fewer only, so a house sat exactly on the
+        // rule with nothing to spare and one emptied shelf put it under), and go on until it holds one kind more than they
+        // want ([Food variety] SpareKinds; Jess, 2026-11-11: "fetch until there are the number the residents demand +1, if
+        // they can. not until all the options are full"), or every kind its shelf takes if that is fewer. From 2026-11-09
+        // to 11 they went on to every kind the shelf takes. Town houses and the living quarters alike. The houses being
+        // filled are kept for the session; after a load the first test starts them again.
+        private static readonly HashSet<Storage> ToppingUp = new HashSet<Storage>();
+        private static int topUpLogs;
+        private static bool WantsVariety(Housing h, Storage st)
+        {
+            if (h == null || st == null) return false;
+            int kinds = FoodKinds(st), target = KindsWanted(h) + Mathf.Max(0, Plugin.VarietySpareKinds.Value);
+            if (ToppingUp.Contains(st))
+            {
+                if (kinds < target && MissingKinds(st).Count > 0) return true;
+                ToppingUp.Remove(st);
+                if (topUpLogs < 6 || Plugin.Verbose.Value) { topUpLogs++; Plugin.Log.LogInfo($"Tailor: a {st.worldObject?.data?.name} holds {kinds} kind(s) ({(kinds >= target ? "its residents want " + KindsWanted(h) + ", and " + (kinds - KindsWanted(h)) + " to spare" : "every kind its shelf takes")}); its variety runs stop until it is down to {KindsWanted(h)} or fewer."); }
+                return false;
+            }
+            if (kinds > KindsWanted(h) || MissingKinds(st).Count == 0) return false;
+            ToppingUp.Add(st);
+            if (topUpLogs < 6 || Plugin.Verbose.Value) { topUpLogs++; Plugin.Log.LogInfo($"Tailor: a {st.worldObject?.data?.name} holds {kinds} kind(s) and its residents want {KindsWanted(h)}; variety runs for it until it holds {target} (or every kind its shelf takes) (lacking {string.Join("/", MissingKinds(st))})."); }
+            return true;
+        }
 
         // The kinds some retrievable store in the kingdom holds right now, kept for the frame (asked per house per tick).
         private static int availFrame = -1;
@@ -467,7 +606,7 @@ namespace FabledomTailor
             foreach (var a in hub.activeAttachments)
             {
                 var h = a != null ? a.GetComponent<Housing>() : null;
-                if (h == null || h.GetStorage() == null || h.isFoodBeingDelivered || FoodKinds(h.GetStorage()) >= KindsWanted(h)) continue;
+                if (h == null || h.GetStorage() == null || h.isFoodBeingDelivered || FoodKinds(h.GetStorage()) > KindsWanted(h)) continue;   // the run that outranks coal and garments is for a house at the rule or under it, not one being topped up beyond
                 if (OnPenalty(h)) return true;
             }
             return false;
@@ -579,7 +718,7 @@ namespace FabledomTailor
                     var st = h.GetStorage();
                     if (st == null || !h.HasResidents() || h.isFoodBeingDelivered) continue;
                     if (h.gridObject?.wo?.data != townHouseData && h.gridObject?.wo?.data?.residentClass != FablingClass.NOBLE) continue;
-                    if (FoodKinds(st) >= KindsWanted(h)) continue;
+                    if (!WantsVariety(h, st)) continue;
                     var missing = MissingKinds(st);
                     if (missing.Count == 0) continue;
                     // only when some store holds a kind this house lacks: otherwise the game's search sends the head to the
@@ -648,13 +787,13 @@ namespace FabledomTailor
                         wrongStoreLogged++;
                         string lacks = string.Join("/", MissingKinds(house));
                         string holds = string.Join("/", Foods.Where(k => pickupStorage.GetResourceAvailable(k) > 0));
-                        Plugin.Log.LogInfo($"Tailor: variety trip to a {house.worldObject?.data?.name} lacking {lacks} was sent to a {pickupStorage.worldObject?.data?.name} holding {(holds.Length > 0 ? holds : "no food")}; the game's pick runs instead.");
+                        if (Plugin.Verbose.Value) Plugin.Log.LogInfo($"Tailor: variety trip to a {house.worldObject?.data?.name} lacking {lacks} was sent to a {pickupStorage.worldObject?.data?.name} holding {(holds.Length > 0 ? holds : "no food")}; the game's pick runs instead.");
                     }
                     return true;
                 }
                 if (worker == null) return true;
                 var home = house.worldObject != null ? house.worldObject.GetComponent<Housing>() : null;
-                if (home != null && FoodKinds(house) >= KindsWanted(home)) return true;
+                if (home != null && !WantsVariety(home, house)) return true;
                 // the kind the residents have gone longest without comes first
                 var lastSeen = new Dictionary<string, int>();
                 if (home != null && home.residents != null)
@@ -744,12 +883,13 @@ namespace FabledomTailor
             return "idle";
         }
 
-        [HarmonyPatch(typeof(WorldEventManager), "HandleStandardWorldEventsOnDayChange"), HarmonyPrefix]
-        private static void Daily()
+        // The variety day's log and counters (called from Garments.Daily).
+        internal static void Daily()
         {
-            if (VarietyRuns + NoStoreHouses.Count + varietyWrongStore + HeldBackHouses.Count > 0)
+            if (Plugin.Verbose.Value && VarietyRuns + NoStoreHouses.Count + varietyWrongStore + HeldBackHouses.Count > 0)
                 Plugin.Log.LogInfo($"Tailor: variety today: {VarietyRuns} run(s) carried a missing kind; {NoStoreHouses.Count} house(s) short of kinds no store holds; {varietyWrongStore} trip(s) found none at the store; {HeldBackHouses.Count} house(s) whose shelf was only spoken for, run held back; coal on offer: {(CoalOnOffer() ? "yes" : "no")}.");
             NoStoreHouses.Clear(); varietyWrongStore = 0; wrongStoreLogged = 0; HeldBackHouses.Clear();
+            ToppingUp.RemoveWhere(st => st == null);   // houses torn down
             if (!Plugin.HeadSampler.Value || Samples.Count == 0) { VarietyRuns = 0; return; }
             string Line(string g)
             {
@@ -762,7 +902,7 @@ namespace FabledomTailor
             foreach (var w in Worker.Instances)
                 if (w != null && Bored(w.needs)) { if (w.fablingClass == FablingClass.NOBLE) boredNobles++; else boredCommoners++; }
             string condo = Line("condo"), palace = Line("palace");
-            if (condo != null) Plugin.Log.LogInfo($"Tailor: condo heads {condo}; second-food runs today {VarietyRuns}; same-food penalty on {boredCommoners} commoners, {boredNobles} nobles.");
+            if (condo != null && Plugin.Verbose.Value) Plugin.Log.LogInfo($"Tailor: condo heads {condo}; second-food runs today {VarietyRuns}; same-food penalty on {boredCommoners} commoners, {boredNobles} nobles.");
             // where the penalised live and what their shelf holds, so a stuck streak can be read from the log (Jess, 2026-10-10)
             if (boredCommoners + boredNobles > 0)
             {

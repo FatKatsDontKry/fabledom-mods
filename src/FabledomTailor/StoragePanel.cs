@@ -7,15 +7,16 @@ using UnityEngine.UI;
 
 namespace FabledomTailor
 {
-    // A house's storage panel has a fixed set of rows; the garment slot is one more than the prefab planned for, so
-    // a row is cloned when needed and the panel is stretched by a row's height.
+    // A house's storage panel has a fixed set of rows; the garment slot is one more than the prefab planned for, and
+    // the living quarters' truffle shelf another, so a row is cloned when needed and the panel is stretched by the
+    // lines our shelves add.
     [HarmonyPatch]
     internal static class StoragePanel
     {
         private static readonly Dictionary<StorageInfo, float> baseHeights = new Dictionary<StorageInfo, float>();
         private static readonly Dictionary<StorageInfo, int> baseRows = new Dictionary<StorageInfo, int>();
         private static readonly Dictionary<StorageInfo, (float, float)> baseLe = new Dictionary<StorageInfo, (float, float)>();
-        private static bool loggedGrow;
+        private static bool loggedGrow; private static int loggedLines;
 
         [HarmonyPatch(typeof(StorageInfo), "UpdateUi"), HarmonyPrefix]
         private static void EnoughRows(StorageInfo __instance)
@@ -48,12 +49,23 @@ namespace FabledomTailor
                 var storage = tr.Field("storage").GetValue<Storage>();
                 var slots = tr.Field("storageSlots").GetValue<List<ResourceUiSlot>>();
                 if (storage == null || slots == null || slots.Count == 0) return;
-                bool ours = storage.resourcesCapacity.Any(r => r != null && r.resourceAmountData != null && r.resourceAmountData.resourceData != null && r.resourceAmountData.resourceData.key == "garment");
-                if (!ours) return;
-                // The rows sit in a grid (3 across, 20 high) inside a slot with a fixed LayoutElement height. Our garment
-                // row can push the grid onto a new line; grow the slot by one line's height for each such line.
-                int visible = slots.Count(sl => sl.gameObject.activeSelf);
-                int oursCount = storage.resourcesCapacity.Count(r => r != null && r.resourceAmountData != null && r.resourceAmountData.resourceData != null && r.resourceAmountData.resourceData.key == "garment");
+                // Our shelves among the rows on show: garments and the quarters' extra shelves (Food.AddedKinds). Until
+                // 2026-11-09 only the garment row was counted, so with the truffle shelf as well (eight rows, three across)
+                // the lines "before ours" came to three, the growth to nothing, and the last line hung out of the panel
+                // (Jess: "the window needs to be a little bigger to accommodate the extra row"). A row stands for the
+                // shelf at its own index, except in a panel that lists only what is stored, which is not a house's.
+                bool storedOnly = tr.Field("onlyShowStored").GetValue<bool>();
+                var oursKinds = Food.AddedKinds();
+                int visible = 0, oursCount = 0;
+                for (int i = 0; i < slots.Count; i++)
+                {
+                    if (slots[i] == null || !slots[i].gameObject.activeSelf) continue;
+                    visible++;
+                    var key = !storedOnly && i < storage.resourcesCapacity.Count ? storage.resourcesCapacity[i]?.resourceAmountData?.resourceData?.key : null;
+                    if (key != null && oursKinds.Contains(key)) oursCount++;
+                }
+                // nothing of ours and never grown: the game's panel as it is; grown before (the panel is reused): back to its own height
+                if (oursCount == 0 && !baseHeights.ContainsKey(__instance)) return;
                 var grid = slots[0].transform.parent.GetComponent<GridLayoutGroup>();
                 var gridRt = slots[0].transform.parent.GetComponent<RectTransform>();
                 int columns = 3;
@@ -80,7 +92,7 @@ namespace FabledomTailor
                     if (minH <= 0 && prefH <= 0) le.preferredHeight = baseHeights[__instance] + grow;
                 }
                 else rt.sizeDelta = new Vector2(rt.sizeDelta.x, baseHeights[__instance] + grow);
-                if (grow > 0 && !loggedGrow) { loggedGrow = true; Plugin.Log.LogInfo($"Tailor: storage panel grown by {grow} ({visible} rows in {columns} columns, {linesNow} lines)."); }
+                if (grow > 0 && (!loggedGrow || linesNow > loggedLines)) { loggedGrow = true; loggedLines = linesNow; Plugin.Log.LogInfo($"Tailor: storage panel grown by {grow} ({visible} rows in {columns} columns, {linesNow} lines; {oursCount} of the rows ours, {linesBefore} line(s) without them)."); }
             }
             catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: storage stretch: " + ex.Message); }
         }

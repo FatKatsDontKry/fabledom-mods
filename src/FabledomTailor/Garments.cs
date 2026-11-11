@@ -24,12 +24,14 @@ namespace FabledomTailor
     [HarmonyPatch]
     internal static class Garments
     {
+        // Someone has gone without garments past the grace days (the sheep letter asks this in two places).
+        internal static bool AnyoneInNeed() => S != null && S.Residents != null && S.Residents.Values.Any(c => c != null && c.Unclothed >= Plugin.GarmentGraceDays.Value);
+
         internal class Clock { public float Days; public int Unclothed; }
         internal class State
         {
             public int Version = 2;   // 2: clocks per resident (by unit guid), not per house
             public Dictionary<string, Clock> Residents = new Dictionary<string, Clock>();
-            public HashSet<string> Filling = new HashSet<string>();   // noble houses currently restocking garments
             public Dictionary<string, float> FarmDebt = new Dictionary<string, float>();   // sheep farms: recovery days owed after a hungry winter (fractional by difficulty)
             public int Share = -1;      // yesterday's wanting share, for the log
             public bool SheepLetterOffered;   // the guaranteed sheep letter on the first garment penalty has been sent
@@ -51,7 +53,7 @@ namespace FabledomTailor
             public HashSet<string> NoblePending = new HashSet<string>();                        // noble letters waiting for an answer
         }
         internal static State S = new State();
-        private static bool loggedSlot;
+        private static bool loggedSlot, loggedOrder;
         private const string SaveKey = "fabTailor";
         private const string Status = "fabNoGarments";
         private const string Key = "garment";
@@ -110,7 +112,10 @@ namespace FabledomTailor
             return d;
         }
         internal static void ConfigChanged() { daysBand = null; }
-        internal static float IntervalDays(Housing h) { var d = DaysByDifficulty(); return h.worldObject.data.residentClass == FablingClass.NOBLE ? d.noble : d.commoner; }
+        // Another plugin may stretch every garment interval (Rivals: the Ministry of Fashion, 1 + 10% a noble at work, set by
+        // reflection on this field and kept in step by it; not saved). 1 is the config's interval.
+        internal static float IntervalScale = 1f;
+        internal static float IntervalDays(Housing h) { var d = DaysByDifficulty(); return (h.worldObject.data.residentClass == FablingClass.NOBLE ? d.noble : d.commoner) * Mathf.Clamp(IntervalScale, 0.1f, 10f); }
 
         // --- the slot ---------------------------------------------------------------------------------------
 
@@ -123,6 +128,8 @@ namespace FabledomTailor
             int capacity = h.worldObject.data.residentClass == FablingClass.NOBLE ? Plugin.GarmentSlotNobles.Value : Plugin.GarmentSlotCommoners.Value;
             storage.resourcesCapacity.Add(new StorageResource { resourceAmountData = new ResourceAmountData(garment, capacity), isRetrievable = false, showWarningIfFull = false });
             if (storage.resourcesStored.All(r => r.key != Key)) storage.resourcesStored.Add(new SaveableResourceAmountData(Key, 0));
+            // the quarters' panel ends garments, coal (Jess, 2026-11-09); the shelf was added after coal
+            if (Food.OrderShelves(storage, h.worldObject.data) && !loggedOrder) { loggedOrder = true; Plugin.Log.LogInfo($"Tailor: a {h.worldObject.data.name}'s shelves put in order with the garment shelf on: {string.Join(", ", storage.resourcesCapacity.Select(r => r?.resourceAmountData?.resourceData?.key))}."); }
             // every wanting house gets its slot again on each load, so this is said once a session
             if (!loggedSlot) { loggedSlot = true; Plugin.Log.LogInfo($"Tailor: garment shelves set up in wanting houses (living quarters {Plugin.GarmentSlotNobles.Value}, commoner houses {Plugin.GarmentSlotCommoners.Value})."); }
         }
@@ -143,7 +150,6 @@ namespace FabledomTailor
                 Plugin.Log.LogInfo($"Tailor: the living quarters' garment shelf now holds {full} ({nobles} nobles).");
                 slot.resourceAmountData.amount = full;
             }
-            S.Filling.Remove(h.worldObject.guid);
             int stored = storage.GetResourceStored(Key);
             // optional background carry by the staff (off by default; the errand does the real walking)
             if (stored < full && Plugin.GarmentBackgroundCarry.Value)
@@ -205,6 +211,9 @@ namespace FabledomTailor
         [HarmonyPatch(typeof(WorldEventManager), "HandleStandardWorldEventsOnDayChange"), HarmonyPrefix]
         private static void Daily()
         {
+            // the food side's day change first (one hook, a fixed order; 2026-11-02)
+            try { Food.ForgetTheDead(); } catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: forgetting the dead's dishes: " + ex.Message); }
+            try { Food.Daily(); } catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: the variety day: " + ex.Message); }
             if (GameManager.Instance == null || GameManager.Instance.IsSandboxMode(isCreativeMode: true)) return;
             try { RulerTrade.EnsureSaves(); } catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: ruler trade: " + ex.Message); }
             try { SheepLetter.Daily(); } catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: sheep letter: " + ex.Message); }
@@ -259,8 +268,8 @@ namespace FabledomTailor
         }
 
         [HarmonyPatch(typeof(DataManager), "Awake"), HarmonyPostfix]
-        private static void HookLoad(DataManager __instance) => __instance.OnLoadComplete += () => Plugin.Instance.StartCoroutine(AfterLoad());
-        private static System.Collections.IEnumerator AfterLoad()
+        private static void HookLoad(DataManager __instance) => __instance.OnLoadComplete += () => Plugin.Instance.StartCoroutine(AfterLoadSettled());
+        private static System.Collections.IEnumerator AfterLoadSettled()
         {
             for (int i = 0; i < 30; i++) yield return null;
             PrepareShelves();
@@ -339,7 +348,8 @@ namespace FabledomTailor
                     bare = storage.GetResourceStored(Key) <= 0 && today - since >= Plugin.GarmentGraceDays.Value;
                 }
                 bool show = !holiday && (anyWithout || bare);   // the traders are dressing everyone
-                var sc = h.gridObject.wo.statusController;
+                var sc = h.gridObject?.wo?.statusController;
+                if (sc == null) continue;
                 if (show && !sc.IsShowing(Status)) sc.Add(Status);
                 else if (!show && sc.IsShowing(Status)) sc.Remove(Status);
             }
@@ -531,7 +541,7 @@ namespace FabledomTailor
             {
                 var info = __instance.GetCurrentPopulationUnlockInfo();
                 int sick = Worker.Instances != null ? Worker.Instances.Count(w => w != null && w.needs != null && w.needs.isSick) : 0;
-                Plugin.Log.LogInfo($"Tailor: visitors rolled: {__result} of {visitors} want to stay at average happiness {__instance.GetAverageWorkerHappiness()} (thresholds {string.Join("/", info.minAverageHappiness)}; {sick} sick, {__instance.GetTotalPopulationCount()} fablings).");
+                if (Plugin.Verbose.Value) Plugin.Log.LogInfo($"Tailor: visitors rolled: {__result} of {visitors} want to stay at average happiness {__instance.GetAverageWorkerHappiness()} (thresholds {string.Join("/", info.minAverageHappiness)}; {sick} sick, {__instance.GetTotalPopulationCount()} fablings).");
                 if (Plugin.HappinessBreakdown.Value) LogHappinessBreakdown(__instance);
             }
             catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: visitor log: " + ex.Message); }

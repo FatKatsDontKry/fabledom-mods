@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>FabledomTailor</AssemblyName>
     <RootNamespace>FabledomTailor</RootNamespace>
-    <Version>0.9.1</Version>
+    <Version>0.9.2</Version>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="tailor_shop.obj" />

@@ -12,6 +12,13 @@ namespace FabledomTailor
     [HarmonyPatch]
     internal static class Tailor
     {
+        // Two private game fields read in several places, without reflection on every call.
+        private static readonly AccessTools.FieldRef<UnitWaypoints, GameObject> WaypointParentRef = AccessTools.FieldRefAccess<UnitWaypoints, GameObject>("waypointParent");
+        private static readonly AccessTools.FieldRef<AnimalHerdFarm, AnimalHerd> HerdRef = AccessTools.FieldRefAccess<AnimalHerdFarm, AnimalHerd>("animalHerd");
+        private static bool wanderWarned;
+        internal static GameObject WaypointParent(UnitWaypoints w) { try { return w != null ? WaypointParentRef(w) : null; } catch { return null; } }
+        internal static AnimalHerd HerdOf(AnimalHerdFarm f) { try { return f != null ? HerdRef(f) : null; } catch { return null; } }
+
         private const string FarmPath = "structures/resource production/sheep farm";
         private const string TailorPath = "structures/resource production/tailor";
         private const string HerdPath = "Animals/Sheep herd";
@@ -81,14 +88,15 @@ namespace FabledomTailor
                 }
                 Recipe(FarmData.resourceProduced, Plugin.WoolGrain.Value, Plugin.WoolBatch.Value, Plugin.WoolSeconds.Value, "wool");
                 Recipe(TailorData.resourceProduced, Plugin.GarmentWool.Value, 1, Plugin.GarmentSeconds.Value, "garment");
-                // Wool and garments carry like food (Jess, 2026-10-06): the cut data left them in a class nobody carries 17 of
+                // Wool and garments carry like the CarryLike resource, when one is set (Jess, 2026-10-06: the cut data left them
+                // in a class nobody carries 17 of; the setting is empty by default, which leaves them as filed)
                 try
                 {
-                    var veg = __instance.resourceSoData.FirstOrDefault(r => r != null && r.key == Plugin.CarryLikeResource.Value);
+                    var like = __instance.resourceSoData.FirstOrDefault(r => r != null && r.key == Plugin.CarryLikeResource.Value);
                     foreach (var key in new[] { "wool", "garment" })
                     {
                         var rd = __instance.resourceSoData.FirstOrDefault(r => r != null && r.key == key);
-                        if (rd != null && veg != null) { var was = rd.weight; rd.weight = veg.weight; Plugin.Log.LogInfo($"Tailor: {key} carry class {was} -> {rd.weight} (like {veg.key})."); }
+                        if (rd != null && like != null) { var was = rd.weight; rd.weight = like.weight; Plugin.Log.LogInfo($"Tailor: {key} carry class {was} -> {rd.weight} (like {like.key})."); }
                     }
                 }
                 catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: carry class: " + ex.Message); }
@@ -246,7 +254,7 @@ namespace FabledomTailor
         [HarmonyPatch(typeof(AnimalHerdFarm), "HandlePlacementCancelled"), HarmonyPrefix]
         private static void DropUndeliveredHerd(AnimalHerdFarm __instance)
         {
-            var herd = Traverse.Create(__instance).Field("animalHerd").GetValue<AnimalHerd>();
+            var herd = HerdOf(__instance);
             if (herd != null && !AnimalHerd.Instances.Contains(herd)) Object.Destroy(herd.gameObject);
         }
 
@@ -257,7 +265,7 @@ namespace FabledomTailor
         {
             try
             {
-                var herd = Traverse.Create(__instance).Field("animalHerd").GetValue<AnimalHerd>();
+                var herd = HerdOf(__instance);
                 if (herd == null) return;
                 if (herd.animals.Count == 0) Traverse.Create(herd).Method("SpawnAnimals").GetValue();
                 if (!AnimalHerd.Instances.Contains(herd)) AnimalHerd.Instances.Add(herd);
@@ -272,13 +280,43 @@ namespace FabledomTailor
 
         // The stub's footprint parts, borrowed from the Cafe (same 2x2): the obstacle box the pathfinder respects, the
         // navigation tag surfaces, and the ground texture that is painted under a finished building and clears the brush.
-        internal static void BorrowFootprint(GameObject tailor, GameObject cafe)
+        // Borrowed onto each building as it wakes, not onto the prefab: a prefab loaded from Resources is a persistent asset,
+        // and a copy made "under" it is made loose instead ("Cannot instantiate objects with a parent which is persistent"),
+        // then thrown away when the map loads, so every Tailor and Confectionery woke with its containers MISSING and its
+        // ColliderController and AlterGroundTexture threw in Awake: no obstacle (walked through), no ground paint (Jess's
+        // logs to 2026-11-04; fixed 2026-11-05). The prefab only records where its parts come from.
+        internal static readonly Dictionary<WorldObjectData, GameObject> FootprintFrom = new Dictionary<WorldObjectData, GameObject>();
+        internal static void BorrowFootprint(GameObject prefab, GameObject cafe)
         {
             try
             {
+                var pWo = prefab != null ? prefab.GetComponent<WorldObject>() : null; var cWo = cafe != null ? cafe.GetComponent<WorldObject>() : null;
+                if (pWo == null || pWo.data == null || cWo == null || cWo.data == null) return;
+                if (pWo.data.gridSize.x != cWo.data.gridSize.x || pWo.data.gridSize.z != cWo.data.gridSize.z) { Plugin.Log.LogWarning($"Tailor: {pWo.data.name}'s footprint differs from {cWo.data.name}'s; its colliders are not borrowed."); return; }
+                FootprintFrom[pWo.data] = cafe;
+                Plugin.Log.LogInfo($"Tailor: {pWo.data.name} borrows its footprint and ground from {cWo.data.name}, on each building as it wakes.");
+            }
+            catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: footprint: " + ex.Message); }
+        }
+
+        // Before either part wakes (whichever comes first), the building takes its copies; once per building.
+        [HarmonyPatch(typeof(ColliderController), "Awake"), HarmonyPrefix]
+        private static void BorrowBeforeColliders(ColliderController __instance) => BorrowOnto(__instance != null ? __instance.gameObject : null);
+        [HarmonyPatch(typeof(AlterGroundTexture), "Awake"), HarmonyPrefix]
+        private static void BorrowBeforeGround(AlterGroundTexture __instance) => BorrowOnto(__instance != null ? __instance.gameObject : null);
+
+        private static readonly HashSet<WorldObjectData> borrowSaid = new HashSet<WorldObjectData>();
+        private static void BorrowOnto(GameObject tailor)
+        {
+            if (tailor == null || FootprintFrom.Count == 0) return;
+            var wo = tailor.GetComponent<WorldObject>();
+            if (wo == null || wo.data == null || !FootprintFrom.TryGetValue(wo.data, out var cafe) || cafe == null) return;
+            if (tailor.transform.Find("Fab footprint borrowed") != null) return;
+            new GameObject("Fab footprint borrowed").transform.SetParent(tailor.transform, false);
+            var data = wo.data;
+            try
+            {
                 var tcc = tailor.GetComponent<ColliderController>(); var ccc = cafe.GetComponent<ColliderController>();
-                var tWo = tailor.GetComponent<WorldObject>(); var cWo = cafe.GetComponent<WorldObject>();
-                if (tWo.data.gridSize.x != cWo.data.gridSize.x || tWo.data.gridSize.z != cWo.data.gridSize.z) { Plugin.Log.LogWarning("Tailor: footprints differ; the Cafe's colliders are not borrowed."); return; }
                 if (tcc != null && ccc != null)
                 {
                     var ct = Traverse.Create(ccc); var tt = Traverse.Create(tcc);
@@ -287,7 +325,7 @@ namespace FabledomTailor
                         var src = ct.Field(name).GetValue<GameObject>();
                         if (src == null) continue;
                         var old = tt.Field(name).GetValue<GameObject>();
-                        if (old != null) Object.DestroyImmediate(old, true);
+                        if (old != null && old.transform.IsChildOf(tailor.transform)) Object.DestroyImmediate(old);   // the building's own, if it had one
                         var copy = Object.Instantiate(src, tailor.transform);
                         copy.name = src.name; copy.transform.localPosition = src.transform.localPosition; copy.transform.localRotation = src.transform.localRotation; copy.transform.localScale = src.transform.localScale;
                         tt.Field(name).SetValue(copy);
@@ -319,7 +357,7 @@ namespace FabledomTailor
                         f.SetValue(tg, f.GetValue(cg));
                     }
                 }
-                Plugin.Log.LogInfo("Tailor: footprint and ground borrowed from the Cafe.");
+                if (borrowSaid.Add(data)) Plugin.Log.LogInfo($"Tailor: {data.name} took its footprint and ground from {cafe.name} as it woke (obstacle and ground paint in place).");
             }
             catch (System.Exception ex) { Plugin.Log.LogWarning("Tailor: footprint: " + ex.Message); }
         }
@@ -331,7 +369,7 @@ namespace FabledomTailor
             try
             {
                 var waypoints = farm.GetComponent<UnitWaypoints>();
-                var parent = waypoints != null ? Traverse.Create(waypoints).Field("waypointParent").GetValue<GameObject>() : null;
+                var parent = WaypointParent(waypoints);
                 if (parent == null) return;
                 var origin = parent.transform.Find("Sheep wander origin");
                 for (int n = 0; ; n++)
@@ -371,7 +409,7 @@ namespace FabledomTailor
                 if (masonryPrefab == null) masonryPrefab = FindPrefab("structures/resource production/stone masonry", "Stone masonry");
                 var source = farm ? pigstyPrefab : masonryPrefab;
                 var waypoints = __instance.GetComponent<UnitWaypoints>();
-                var parent = waypoints != null ? Traverse.Create(waypoints).Field("waypointParent").GetValue<GameObject>() : null;
+                var parent = WaypointParent(waypoints);
                 if (source == null || parent == null) return;
                 if (tailor) AddConstructionSpots(__instance, waypoints, Plugin.TailorConstructionSpots.Value);
                 if (parent.transform.Find("Fab work spot 0") != null) return;
@@ -536,7 +574,7 @@ namespace FabledomTailor
             {
                 if (wo == null || wo.data != FarmData) continue;
                 var wps = wo.GetComponent<UnitWaypoints>();
-                var parent = wps != null ? Traverse.Create(wps).Field("waypointParent").GetValue<GameObject>() : null;
+                var parent = WaypointParent(wps);
                 var o = parent != null ? parent.transform.Find("Sheep wander origin") : null;
                 var at = o != null ? o.position : wo.transform.position;
                 if (Vector3.Distance(new Vector3(at.x, 0f, at.z), new Vector3(origin.x, 0f, origin.z)) < 4f) { FarmByOrigin[origin] = wo.transform; return wo.transform; }
@@ -580,7 +618,7 @@ namespace FabledomTailor
                 WanderPause(__instance) = Random.Range(__instance.minTimeBetweenDestinations.Value, __instance.maxTimeBetweenDestinations.Value);
                 return false;
             }
-            catch { return true; }
+            catch (System.Exception ex) { if (!wanderWarned) { wanderWarned = true; Plugin.Log.LogWarning("Tailor: pen wander fell back to the game's wander: " + ex.Message); } return true; }
         }
 
         // --- the Tailor's look: the cafe without its furniture, plus a clothing line and a banner ---

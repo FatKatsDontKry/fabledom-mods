@@ -61,11 +61,20 @@ namespace FabledomTailor
         // full load would not fit. Once the farm holds that much, it is back to the game's own rule for the rest of winter.
         // The shearer only goes for grain when the farm cannot make its next wool ("not enough input"), and keeps shearing
         // the store down until then (Jess, 2026-10-08). While a farm is topping up, it reads as short, so the worker goes.
+        // The fill in any season (Jess, 2026-11-08: the sheep farm and the truffle farm have a penalty for standing empty, so
+        // they fetch below GrainKeep and fill to WinterFillTo, the winter's number, all year): a store under GrainKeep starts a fill
+        // here, where the game asks whether the next wool can be made, and the fill reads as short until the store holds the
+        // number, so the shearer fetches carry after carry (the game's workers only fetch when a batch is short, and then to a
+        // carry short of full).
+        private static int keepLogs;
         [HarmonyPatch(typeof(ProductionPlace), nameof(ProductionPlace.HasEnoughInput)), HarmonyPostfix]
         private static void ShortUntilToppedUp(ProductionPlace __instance, ref bool __result)
         {
-            if (!__result || !IsFarm(__instance) || __instance.worldObject.guid == null || !Garments.S.TopUp.Contains(__instance.worldObject.guid)) return;
+            if (!IsFarm(__instance) || __instance.worldObject.guid == null) return;
             int grain = __instance.storage != null ? __instance.storage.GetResourceStored("grain") : 0;
+            if (grain < Plugin.GrainKeep.Value && Plugin.WinterRule.Value && Garments.S.TopUp.Add(__instance.worldObject.guid) && keepLogs++ < 6)
+                Plugin.Log.LogInfo($"Tailor: Sheep farm ({__instance.worldObject.guid.Substring(0, 8)}) is down to {grain} grain; the shearer fills the store to {Plugin.WinterFillTo.Value}.");
+            if (!__result || !Garments.S.TopUp.Contains(__instance.worldObject.guid)) return;
             if (grain < Plugin.WinterFillTo.Value) __result = false;
         }
 
@@ -120,6 +129,7 @@ namespace FabledomTailor
             if (!Plugin.WinterRule.Value || Tailor.FarmData == null) return;
             bool winter = IsWinter();
             var dtm = DateTimeManager.Instance;
+            if (dtm == null || dtm.dateTimeData == null) return;
             string season = dtm.dateTimeData.currentSeason.ToString();
             bool winterBegins = winter && Garments.S.LastSeason != season && Garments.S.LastSeason != "";
             Garments.S.LastSeason = season;

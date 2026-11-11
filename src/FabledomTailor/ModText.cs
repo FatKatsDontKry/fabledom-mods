@@ -12,6 +12,10 @@ namespace FabledomTailor
     {
         private static readonly ConditionalWeakTable<LocalizedString, Func<string>> Texts = new ConditionalWeakTable<LocalizedString, Func<string>>();
 
+        // A shallow copy of any plain object (the game's letter options are copied this way).
+        private static readonly System.Reflection.MethodInfo CloneMethod = typeof(object).GetMethod("MemberwiseClone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        internal static T Clone<T>(T o) where T : class => (T)CloneMethod.Invoke(o, null);
+
         internal static LocalizedString Make(string text) => Make(() => text);
 
         internal static LocalizedString Make(Func<string> text)

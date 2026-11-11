@@ -21,8 +21,7 @@ namespace FabledomTailor
         private const string WardrobeQuest = "fabNobleWardrobeQuest", PastriesQuest = "fabNoblePastriesQuest";
         internal static readonly string[] LetterKeys = { Fashion, Wardrobe, Pastries };
         private static readonly string[] QuestKeys = { WardrobeQuest, PastriesQuest };
-        private static readonly System.Reflection.MethodInfo Clone = typeof(object).GetMethod("MemberwiseClone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        private static WorldEventActionData Copy(WorldEventActionData a) => (WorldEventActionData)Clone.Invoke(a, null);
+        private static WorldEventActionData Copy(WorldEventActionData a) => ModText.Clone(a);
         private static bool ready;
 
         [HarmonyPatch(typeof(DataManager), "Awake"), HarmonyPostfix, HarmonyPriority(Priority.Low)]

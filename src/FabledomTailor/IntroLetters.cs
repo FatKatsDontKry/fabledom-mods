@@ -22,8 +22,7 @@ namespace FabledomTailor
         private const string ShepherdQuest = "fabShepherdQuest", TailorQuest = "fabTailorQuest";
         private static readonly string[] LetterKeys = { TasteExotic, ShepherdsSeason, SupperServed, TailorCourt, DressedPalace, LatestFashion };
         private static readonly string[] QuestKeys = { ShepherdQuest, TailorQuest };
-        private static readonly System.Reflection.MethodInfo Clone = typeof(object).GetMethod("MemberwiseClone", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        private static WorldEventActionData Copy(WorldEventActionData a) => (WorldEventActionData)Clone.Invoke(a, null);
+        private static WorldEventActionData Copy(WorldEventActionData a) => ModText.Clone(a);
         private static bool ready;
 
         // --- setup ---------------------------------------------------------------------------------
